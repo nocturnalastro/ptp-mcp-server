@@ -29,7 +29,15 @@ class PTPQueryEngine:
                 r"ptp configuration",
                 r"ptpconfig",
                 r"configuration parameters",
-                r"show config"
+                r"show config",
+                r"clock type",
+                r"clock.?type",
+                r"ordinary.?clock",
+                r"boundary.?clock",
+                r"grandmaster.?clock",
+                r"t-?bc",
+                r"what type of clock",
+                r"what kind of clock",
             ],
             "sync_status": [
                 r"check for sync loss",
@@ -257,7 +265,23 @@ class PTPQueryEngine:
         domain = config.get("domain", "unknown")
         
         response += f"- Name: {name}\n"
-        response += f"- Clock Type: {clock_type}\n"
+
+        clock_type_descriptions = {
+            "OC": "Ordinary Clock (OC)",
+            "BC": "Boundary Clock (BC)",
+            "GM": "Grandmaster (GM)",
+            "T-BC": "Telecom Boundary Clock (T-BC)",
+        }
+        response += f"- Clock Type: {clock_type_descriptions.get(clock_type, clock_type)}\n"
+
+        receiver = config.get("receiver_profile")
+        transmitter = config.get("transmitter_profile")
+        if receiver and transmitter:
+            response += f"  - Receiver profile: {receiver}\n"
+            response += f"  - Transmitter profile: {transmitter}\n"
+            if config.get("has_ts2phc"):
+                response += f"  - ts2phc: configured on receiver\n"
+
         response += f"- Domain: {domain}\n"
         
         # Priorities
@@ -326,8 +350,15 @@ class PTPQueryEngine:
             clock_type = current_clock.get("type", "unknown")
             domain = current_clock.get("domain", "unknown")
             clock_class = current_clock.get("clock_class", "unknown")
-            
-            response += f"- Current Clock: {clock_type} (Domain {domain}, Class {clock_class})\n"
+            clock_type_labels = {
+                "OC": "Ordinary Clock",
+                "BC": "Boundary Clock",
+                "GM": "Grandmaster",
+                "T-BC": "Telecom Boundary Clock",
+            }
+            label = clock_type_labels.get(clock_type, clock_type)
+
+            response += f"- Current Clock: {label} (Domain {domain}, Class {clock_class})\n"
         
         grandmaster = hierarchy.get("grandmaster")
         if grandmaster:

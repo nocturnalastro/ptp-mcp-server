@@ -46,20 +46,30 @@ class PTPTools:
                 # Validate ITU-T compliance
                 itu_validation = self.model.validate_itu_t_compliance(ptp_config)
 
+                config_result = {
+                    "name": ptp_config.name,
+                    "namespace": ptp_config.namespace,
+                    "clock_type": ptp_config.clock_type.value,
+                    "domain": ptp_config.domain,
+                    "priorities": ptp_config.priorities,
+                    "clock_class": ptp_config.clock_class,
+                    "sync_intervals": ptp_config.sync_intervals,
+                    "thresholds": ptp_config.thresholds,
+                    "profiles": ptp_config.profiles,
+                    "recommendations": ptp_config.recommendations,
+                }
+
+                if ptp_config.profile_group is not None:
+                    config_result["receiver_profile"] = ptp_config.receiver_profile
+                    config_result["transmitter_profile"] = ptp_config.transmitter_profile
+                    config_result["has_ts2phc"] = ptp_config.has_ts2phc
+
+                if ptp_config.warnings:
+                    config_result["warnings"] = ptp_config.warnings
+
                 return {
                     "success": True,
-                    "configuration": {
-                        "name": ptp_config.name,
-                        "namespace": ptp_config.namespace,
-                        "clock_type": ptp_config.clock_type.value,
-                        "domain": ptp_config.domain,
-                        "priorities": ptp_config.priorities,
-                        "clock_class": ptp_config.clock_class,
-                        "sync_intervals": ptp_config.sync_intervals,
-                        "thresholds": ptp_config.thresholds,
-                        "profiles": ptp_config.profiles,
-                        "recommendations": ptp_config.recommendations
-                    },
+                    "configuration": config_result,
                     "validation": validation,
                     "itu_compliance": itu_validation,
                     "raw_data": config_data
@@ -365,10 +375,18 @@ class PTPTools:
                         })
 
                 # 3. Current node (this OpenShift node)
+                current_clock_type = hierarchy.get("current_clock", {}).get("type", "OC")
+                clock_type_labels = {
+                    "OC": "Ordinary Clock",
+                    "BC": "Boundary Clock",
+                    "GM": "Grandmaster",
+                    "T-BC": "Telecom Boundary Clock",
+                }
+                current_role_label = clock_type_labels.get(current_clock_type, current_clock_type)
                 hierarchy_chain.append({
                     "level": 3,
-                    "role": "Current Node (Ordinary Clock)",
-                    "clock_type": hierarchy.get("current_clock", {}).get("type", "OC"),
+                    "role": f"Current Node ({current_role_label})",
+                    "clock_type": current_clock_type,
                     "domain": hierarchy.get("current_clock", {}).get("domain"),
                     "clock_class": hierarchy.get("current_clock", {}).get("clock_class"),
                     "priority1": hierarchy.get("current_clock", {}).get("priorities", {}).get("priority1"),
@@ -567,7 +585,7 @@ class PTPTools:
                     try:
                         config_data = await self.config_parser.get_ptp_configs(kubeconfig_path=kubeconfig_path)
                         ptp_config = self.model.create_ptp_configuration(config_data)
-                        data["configuration"] = {
+                        conf_data = {
                             "name": ptp_config.name,
                             "clock_type": ptp_config.clock_type.value,
                             "domain": ptp_config.domain,
@@ -575,6 +593,13 @@ class PTPTools:
                             "clock_class": ptp_config.clock_class,
                             "sync_intervals": ptp_config.sync_intervals
                         }
+                        if ptp_config.profile_group is not None:
+                            conf_data["receiver_profile"] = ptp_config.receiver_profile
+                            conf_data["transmitter_profile"] = ptp_config.transmitter_profile
+                            conf_data["has_ts2phc"] = ptp_config.has_ts2phc
+                        if ptp_config.warnings:
+                            conf_data["warnings"] = ptp_config.warnings
+                        data["configuration"] = conf_data
                     except Exception as e:
                         data["configuration"] = {"error": str(e)}
 
