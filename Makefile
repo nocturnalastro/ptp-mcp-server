@@ -9,7 +9,7 @@ RAG_TOOL_IMAGE ?= registry.redhat.io/openshift-lightspeed-tech-preview/lightspee
 BYOK_OUTPUT_DIR ?= /tmp/byok-output
 DOCS_DIR ?= docs
 
-.PHONY: docker-build docker-push deploy test
+.PHONY: docker-build docker-push byok-build byok-push deploy test test-server
 
 docker-build:
 	$(CONTAINER_TOOL) build -t $(SERVER_IMAGE) .
@@ -36,3 +36,6 @@ deploy:
 
 test:
 	python quick_test.py
+
+test-server:
+	python3 test_ptp_server.py
