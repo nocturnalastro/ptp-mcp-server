@@ -472,9 +472,14 @@ class PTPModel:
             clock_type = profile_group.clock_type
             has_ts2phc = profile_group.has_ts2phc
         else:
-            # Determine clock type from individual profile ptp4lConf
-            clock_type = self._determine_clock_type(profiles)
-            has_ts2phc = False
+            # Check for T-GM before falling back to ptp4l clock_type
+            clock_type = self._detect_grandmaster(profiles)
+            if clock_type is None:
+                clock_type = self._determine_clock_type(profiles)
+            has_ts2phc = any(
+                bool((p.get("ts2phcConf") or "").strip())
+                for p in profiles
+            )
 
         # Extract domain
         domain = self._extract_domain(profiles)
@@ -508,13 +513,36 @@ class PTPModel:
         )
     
     def _get_profile_clock_type_str(self, profile: Dict[str, Any]) -> str:
-        """Extract clock_type string from a single profile's ptp4lConf."""
+        """Extract ptp4l_clock_type string from a single profile's ptp4lConf."""
         ptp4l_conf = profile.get("ptp4lConf", {})
-        clock_type_str = ptp4l_conf.get("global", {}).get("clock_type", "")
+        clock_type_str = ptp4l_conf.get("global", {}).get("ptp4l_clock_type", "")
         return str(clock_type_str).upper()
 
+    def _detect_grandmaster(self, profiles: List[Dict[str, Any]]) -> Optional[ClockType]:
+        """Detect T-GM: all master ports, ts2phc configured, high clock class.
+
+        Also checks ptpSettings.clockType == "T-GM" as an explicit signal.
+        Returns ClockType.GRANDMASTER if detected, None otherwise.
+        """
+        for profile in profiles:
+            # Explicit ptpSettings.clockType takes priority
+            if profile.get("ptpSettings", {}).get("clockType") == "T-GM":
+                return ClockType.GRANDMASTER
+
+        # Structural detection: single profile, all-master ports, ts2phc present
+        if len(profiles) == 1:
+            profile = profiles[0]
+            port_role = self._get_profile_port_roles(profile)
+            ts2phc_conf = (profile.get("ts2phcConf") or "").strip()
+            clock_class = profile.get("ptp4lConf", {}).get("global", {}).get("clockClass", 248)
+
+            if port_role == "master-only" and ts2phc_conf and clock_class <= 7:
+                return ClockType.GRANDMASTER
+
+        return None
+
     def _determine_clock_type(self, profiles: List[Dict[str, Any]]) -> ClockType:
-        """Determine clock type from profiles"""
+        """Determine clock type from ptp4l_clock_type in profiles"""
         for profile in profiles:
             clock_type_str = self._get_profile_clock_type_str(profile)
 

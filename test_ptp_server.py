@@ -251,12 +251,12 @@ def test_clock_type_detection():
 
     print("\n=== Clock Type Detection Tests ===\n")
 
-    # --- Single-profile BC (clock_type in [global]) ---
-    print("1. Single-profile BC with clock_type in [global]")
+    # --- Single-profile BC (ptp4l_clock_type in [global]) ---
+    print("1. Single-profile BC with ptp4l_clock_type in [global]")
     config = build_config_data([{
         "name": "bc-profile",
         "ptp4lConf": {
-            "global": {"clock_type": "BC", "domainNumber": 24, "boundary_clock_jbod": 1},
+            "global": {"ptp4l_clock_type": "BC", "domainNumber": 24, "boundary_clock_jbod": 1},
             "interfaces": {"ens1f0": {"masterOnly": 0}, "ens1f1": {"masterOnly": 1}},
             "servo": {}, "transport": {}, "clock": {}
         },
@@ -274,7 +274,7 @@ def test_clock_type_detection():
             "phc2sysOpts": "-a -r",
             "ts2phcConf": "[global]\nuse_syslog 0\n[ens1f0]\nts2phc.extts_polarity rising\n",
             "ptp4lConf": {
-                "global": {"clock_type": "OC", "domainNumber": 24, "clockClass": 248,
+                "global": {"ptp4l_clock_type": "OC", "domainNumber": 24, "clockClass": 248,
                            "boundary_clock_jbod": 1, "slaveOnly": 0},
                 "interfaces": {"ens1f0": {"masterOnly": 0}},
                 "servo": {}, "transport": {}, "clock": {}
@@ -284,7 +284,7 @@ def test_clock_type_detection():
         {
             "name": "tbc-tt",
             "ptp4lConf": {
-                "global": {"clock_type": "BC", "domainNumber": 24, "clockClass": 248,
+                "global": {"ptp4l_clock_type": "BC", "domainNumber": 24, "clockClass": 248,
                            "boundary_clock_jbod": 1},
                 "interfaces": {"ens1f1": {"masterOnly": 1}},
                 "servo": {}, "transport": {}, "clock": {}
@@ -307,7 +307,7 @@ def test_clock_type_detection():
             "name": "bc-slave",
             "phc2sysOpts": "-a -r",
             "ptp4lConf": {
-                "global": {"clock_type": "OC", "domainNumber": 24},
+                "global": {"ptp4l_clock_type": "OC", "domainNumber": 24},
                 "interfaces": {"ens2f0": {"masterOnly": 0}},
                 "servo": {}, "transport": {}, "clock": {}
             },
@@ -316,7 +316,7 @@ def test_clock_type_detection():
         {
             "name": "bc-master",
             "ptp4lConf": {
-                "global": {"clock_type": "BC", "domainNumber": 24},
+                "global": {"ptp4l_clock_type": "BC", "domainNumber": 24},
                 "interfaces": {"ens2f1": {"masterOnly": 1}},
                 "servo": {}, "transport": {}, "clock": {}
             },
@@ -336,7 +336,7 @@ def test_clock_type_detection():
         {
             "name": "orphan",
             "ptp4lConf": {
-                "global": {"clock_type": "OC", "domainNumber": 24},
+                "global": {"ptp4l_clock_type": "OC", "domainNumber": 24},
                 "interfaces": {"ens3f0": {"masterOnly": 1}},
                 "servo": {}, "transport": {}, "clock": {}
             },
@@ -351,7 +351,7 @@ def test_clock_type_detection():
           "does-not-exist" in ptp_config.warnings[0], True)
 
     # --- Single-profile OC (default) ---
-    print("\n5. Single-profile OC (no clock_type set)")
+    print("\n5. Single-profile OC (no ptp4l_clock_type set)")
     config = build_config_data([{
         "name": "oc-profile",
         "ptp4lConf": {
@@ -370,7 +370,7 @@ def test_clock_type_detection():
             "name": "tbc-tr-bad",
             "ts2phcConf": "[global]\nverbose 1\n",
             "ptp4lConf": {
-                "global": {"clock_type": "OC", "domainNumber": 24},
+                "global": {"ptp4l_clock_type": "OC", "domainNumber": 24},
                 "interfaces": {"ens5f0": {"masterOnly": 1}},
                 "servo": {}, "transport": {}, "clock": {}
             },
@@ -379,7 +379,7 @@ def test_clock_type_detection():
         {
             "name": "tbc-tt-bad",
             "ptp4lConf": {
-                "global": {"clock_type": "BC", "domainNumber": 24},
+                "global": {"ptp4l_clock_type": "BC", "domainNumber": 24},
                 "interfaces": {"ens5f1": {"masterOnly": 1}},
                 "servo": {}, "transport": {}, "clock": {}
             },
@@ -395,7 +395,7 @@ def test_clock_type_detection():
     config = build_config_data([{
         "name": "self-ref",
         "ptp4lConf": {
-            "global": {"clock_type": "BC", "domainNumber": 24},
+            "global": {"ptp4l_clock_type": "BC", "domainNumber": 24},
             "interfaces": {"ens6f0": {"masterOnly": 0}},
             "servo": {}, "transport": {}, "clock": {}
         },
@@ -469,9 +469,11 @@ def test_config_parser_profile_fields():
     check("profile 1 controllingProfile",
           p1["ptpSettings"].get("controllingProfile"), "tbc-tr")
 
-    # Verify clock_type is now in global section
-    check("profile 0 clock_type in global",
-          p0["ptp4lConf"]["global"].get("clock_type"), "OC")
+    # Verify parser rename from clock_type -> ptp4l_clock_type
+    check("profile 0 ptp4l_clock_type in global",
+          p0["ptp4lConf"]["global"].get("ptp4l_clock_type"), "OC")
+    check("profile 0 legacy clock_type removed",
+          p0["ptp4lConf"]["global"].get("clock_type"), None)
 
     print(f"\n--- Results: {passed} passed, {failed} failed ---")
     return failed == 0

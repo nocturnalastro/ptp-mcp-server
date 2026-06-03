@@ -151,6 +151,11 @@ class PTPConfigParser:
                 key, value = line.split(' ', 1)
                 key = key.strip()
                 value = value.strip()
+
+                # Rename ptp4l's clock_type to ptp4l_clock_type to avoid
+                # confusion with the detected overall clock type
+                if key == "clock_type" and current_section == "global":
+                    key = "ptp4l_clock_type"
                 
                 if current_section == "interfaces":
                     parsed_conf["interfaces"][interface_name][key] = self._parse_value(value)
@@ -206,10 +211,10 @@ class PTPConfigParser:
         }
     
     def get_clock_type(self, config: Dict[str, Any]) -> str:
-        """Extract clock type from PTP configuration"""
+        """Extract ptp4l clock type from PTP configuration"""
         for profile in config.get("spec", {}).get("profile", []):
             ptp4l_conf = profile.get("ptp4lConf", {})
-            clock_type = ptp4l_conf.get("global", {}).get("clock_type")
+            clock_type = ptp4l_conf.get("global", {}).get("ptp4l_clock_type")
             if clock_type:
                 return clock_type
         return "Unknown"
