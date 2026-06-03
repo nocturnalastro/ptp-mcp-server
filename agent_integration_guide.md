@@ -349,14 +349,53 @@ asyncio.run(ask_questions())
   "grandmaster": {
     "status": "s0",
     "interface": "ens7f0",
-    "offset": -12,
-    "frequency": -6701
+    "last_offsets": {
+      "ptp4l": {
+        "offset_ns": -18,
+        "frequency": -210,
+        "state": "s2",
+        "timestamp": "2026-06-02T13:58:21Z"
+      },
+      "phc2sys": {
+        "offset_ns": -12,
+        "frequency": -6701,
+        "state": "s2",
+        "timestamp": "2026-06-02T13:58:22Z"
+      },
+      "ts2phc": {
+        "offset_ns": -7,
+        "frequency": null,
+        "state": "s2",
+        "timestamp": "2026-06-02T13:58:20Z"
+      }
+    }
   },
   "sync_status": {
     "dpll_locked": true,
     "gnss_available": true,
     "offset_in_range": true,
-    "last_offset": -2
+    "last_offsets": {
+      "dpll": {
+        "offset_ns": -2,
+        "in_spec": true,
+        "timestamp": "2026-06-02T13:58:23Z"
+      },
+      "ptp4l": {
+        "offset_ns": -18,
+        "state": "s2",
+        "timestamp": "2026-06-02T13:58:21Z"
+      },
+      "phc2sys": {
+        "offset_ns": -12,
+        "state": "s2",
+        "timestamp": "2026-06-02T13:58:22Z"
+      },
+      "ts2phc": {
+        "offset_ns": -7,
+        "state": "s2",
+        "timestamp": "2026-06-02T13:58:20Z"
+      }
+    }
   },
   "log_entries": [...]
 }

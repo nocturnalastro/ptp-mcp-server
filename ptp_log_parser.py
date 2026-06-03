@@ -452,8 +452,7 @@ class PTPLogParser:
             "status": "unknown",
             "interface": None,
             "last_seen": None,
-            "offset": None,
-            "frequency": None
+            "last_offsets": {},
         }
         
         # Look for GM status messages
@@ -464,12 +463,20 @@ class PTPLogParser:
             gm_info["interface"] = latest_gm.parsed_data.get("interface")
             gm_info["last_seen"] = latest_gm.timestamp.isoformat() if latest_gm.timestamp else None
         
-        # Look for phc2sys offset information
-        phc2sys_logs = [log for log in logs if log.component == "phc2sys"]
-        if phc2sys_logs:
-            latest_phc2sys = max(phc2sys_logs, key=lambda x: x.timestamp)
-            gm_info["offset"] = latest_phc2sys.parsed_data.get("offset")
-            gm_info["frequency"] = latest_phc2sys.parsed_data.get("frequency")
+        # Extract per-component offset and frequency
+        for component in ("ptp4l", "phc2sys", "ts2phc"):
+            comp_logs = [
+                log for log in logs
+                if log.component == component and log.parsed_data.get("offset") is not None
+            ]
+            if comp_logs:
+                latest = max(comp_logs, key=lambda x: x.timestamp)
+                gm_info["last_offsets"][component] = {
+                    "offset_ns": latest.parsed_data["offset"],
+                    "frequency": latest.parsed_data.get("frequency"),
+                    "state": latest.parsed_data.get("state"),
+                    "timestamp": latest.timestamp.isoformat() if latest.timestamp else None,
+                }
         
         return gm_info
     
@@ -479,7 +486,7 @@ class PTPLogParser:
             "dpll_locked": False,
             "gnss_available": False,
             "offset_in_range": False,
-            "last_offset": None,
+            "last_offsets": {},
             "last_update": None,
             "servo_state": None,
             "port_state": None,
@@ -503,7 +510,12 @@ class PTPLogParser:
             if "status" in parsed:
                 sync_status["dpll_locked"] = parsed.get("status", 0) == 3
                 sync_status["offset_in_range"] = parsed.get("in_spec", False)
-                sync_status["last_offset"] = parsed.get("offset")
+                if parsed.get("offset") is not None:
+                    sync_status["last_offsets"]["dpll"] = {
+                        "offset_ns": parsed["offset"],
+                        "in_spec": parsed.get("in_spec"),
+                        "timestamp": latest_dpll.timestamp.isoformat() if latest_dpll.timestamp else None,
+                    }
                 sync_status["last_update"] = latest_dpll.timestamp.isoformat() if latest_dpll.timestamp else None
                 if parsed.get("source_lost"):
                     sync_status["dpll_source_lost"] = True
@@ -520,7 +532,11 @@ class PTPLogParser:
                 sync_status["dpll_pps_status"] = comp_parsed.get("pps_status")
                 sync_status["dpll_state"] = comp_parsed.get("state")
                 if comp_parsed.get("offset") is not None:
-                    sync_status["last_offset"] = comp_parsed["offset"]
+                    sync_status["last_offsets"]["dpll"] = {
+                        "offset_ns": comp_parsed["offset"],
+                        "state": comp_parsed.get("state"),
+                        "timestamp": latest_dpll_comp.timestamp.isoformat() if latest_dpll_comp.timestamp else None,
+                    }
                 # Use DPLL state to determine lock if no decision message was found
                 if "status" not in parsed:
                     dpll_state = comp_parsed.get("state", "").lower()
@@ -548,9 +564,39 @@ class PTPLogParser:
             # Check offset is in range (within 1000ns is generally good)
             offset = parsed.get("offset")
             if offset is not None:
-                sync_status["last_offset"] = offset
+                sync_status["last_offsets"]["phc2sys"] = {
+                    "offset_ns": offset,
+                    "state": servo_state,
+                    "timestamp": latest_phc2sys.timestamp.isoformat() if latest_phc2sys.timestamp else None,
+                }
                 sync_status["offset_in_range"] = abs(offset) < 1000
                 sync_status["last_update"] = latest_phc2sys.timestamp.isoformat() if latest_phc2sys.timestamp else None
+
+        # Extract ptp4l offset
+        ptp4l_offset_logs = [
+            log for log in logs
+            if log.component == "ptp4l" and log.parsed_data.get("offset") is not None
+        ]
+        if ptp4l_offset_logs:
+            latest_ptp4l_offset = max(ptp4l_offset_logs, key=lambda x: x.timestamp)
+            sync_status["last_offsets"]["ptp4l"] = {
+                "offset_ns": latest_ptp4l_offset.parsed_data["offset"],
+                "state": latest_ptp4l_offset.parsed_data.get("state"),
+                "timestamp": latest_ptp4l_offset.timestamp.isoformat() if latest_ptp4l_offset.timestamp else None,
+            }
+
+        # Extract ts2phc offset
+        ts2phc_offset_logs = [
+            log for log in logs
+            if log.component == "ts2phc" and log.parsed_data.get("offset") is not None
+        ]
+        if ts2phc_offset_logs:
+            latest_ts2phc_offset = max(ts2phc_offset_logs, key=lambda x: x.timestamp)
+            sync_status["last_offsets"]["ts2phc"] = {
+                "offset_ns": latest_ts2phc_offset.parsed_data["offset"],
+                "state": latest_ts2phc_offset.parsed_data.get("state"),
+                "timestamp": latest_ts2phc_offset.timestamp.isoformat() if latest_ts2phc_offset.timestamp else None,
+            }
 
         # Look for ptp4l port state transitions and BMCA decisions
         ptp4l_logs = [log for log in logs if log.component == "ptp4l"]

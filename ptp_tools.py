@@ -312,6 +312,25 @@ class PTPTools:
 
         return result
 
+    def _extract_per_component_offsets(self, logs) -> Dict[str, Any]:
+        """Extract the most recent offset from each PTP component."""
+        offsets = {}
+
+        for component in ("ptp4l", "phc2sys", "ts2phc"):
+            comp_logs = [
+                log for log in logs
+                if log.component == component and log.parsed_data.get("offset") is not None
+            ]
+            if comp_logs:
+                latest = max(comp_logs, key=lambda x: x.timestamp)
+                offsets[component] = {
+                    "offset_ns": latest.parsed_data["offset"],
+                    "state": latest.parsed_data.get("state"),
+                    "timestamp": latest.timestamp.isoformat() if latest.timestamp else None,
+                }
+
+        return offsets
+
     async def get_clock_hierarchy(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Get current clock hierarchy"""
         try:
@@ -497,12 +516,19 @@ class PTPTools:
                         logs = await self.log_parser.get_ptp_logs(kubeconfig_path=kubeconfig_path)
                         sync_status = self.log_parser.extract_sync_status(logs)
 
-                        health_result["checks"]["synchronization"] = {
+                        sync_check = {
                             "dpll_locked": sync_status.get("dpll_locked", False),
                             "offset_in_range": sync_status.get("offset_in_range", False),
                             "gnss_available": sync_status.get("gnss_available", False),
-                            "last_offset": sync_status.get("last_offset")
+                            "last_offsets": self._extract_per_component_offsets(logs),
                         }
+
+                        if sync_status.get("servo_state"):
+                            sync_check["servo_state"] = sync_status["servo_state"]
+                        if sync_status.get("port_state"):
+                            sync_check["port_state"] = sync_status["port_state"]
+
+                        health_result["checks"]["synchronization"] = sync_check
                     except Exception as e:
                         health_result["checks"]["synchronization"] = {
                             "error": str(e)
