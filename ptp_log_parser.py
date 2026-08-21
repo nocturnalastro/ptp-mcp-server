@@ -151,8 +151,12 @@ class PTPLogParser:
                 match = re.match(pattern, line)
                 if match:
                     component = comp_name
+                    config_tag = match.group(2)
                     message = match.group(3)
                     parsed_data = self._parse_component_message(message, component)
+                    # Keep only the config file (strip optional :line suffix)
+                    config_file = config_tag.rsplit(":", 1)[0] if ":" in config_tag else config_tag
+                    parsed_data["config_tag"] = config_file
                     break
         
         return LogEntry(
@@ -446,8 +450,24 @@ class PTPLogParser:
         # Default to last hour
         return now - timedelta(hours=1)
     
-    def extract_grandmaster_info(self, logs: List[LogEntry]) -> Dict[str, Any]:
+    def _filter_by_config_tags(self, logs: List[LogEntry], config_tags: Optional[set]) -> List[LogEntry]:
+        """Filter logs to those matching config_tags (or logs without tag).
+
+        A single profile can map to multiple runtime configs (ptp4l, ts2phc,
+        phc2sys), so config_tags is a set. Logs without a config_tag
+        (e.g., many Go-style daemon messages) are retained.
+        """
+        if not config_tags:
+            return logs
+        return [
+            log for log in logs
+            if "config_tag" not in log.parsed_data
+            or log.parsed_data["config_tag"] in config_tags
+        ]
+
+    def extract_grandmaster_info(self, logs: List[LogEntry], config_tags: Optional[set] = None) -> Dict[str, Any]:
         """Extract grandmaster information from logs"""
+        logs = self._filter_by_config_tags(logs, config_tags)
         gm_info = {
             "status": "unknown",
             "interface": None,
@@ -478,8 +498,9 @@ class PTPLogParser:
         
         return gm_info
     
-    def extract_sync_status(self, logs: List[LogEntry]) -> Dict[str, Any]:
+    def extract_sync_status(self, logs: List[LogEntry], config_tags: Optional[set] = None) -> Dict[str, Any]:
         """Extract synchronization status from logs"""
+        logs = self._filter_by_config_tags(logs, config_tags)
         sync_status = {
             "dpll_locked": False,
             "gnss_available": False,
@@ -664,8 +685,9 @@ class PTPLogParser:
 
         return sync_status
     
-    def extract_clock_hierarchy(self, logs: List[LogEntry]) -> Dict[str, Any]:
+    def extract_clock_hierarchy(self, logs: List[LogEntry], config_tags: Optional[set] = None) -> Dict[str, Any]:
         """Extract clock hierarchy information from logs"""
+        logs = self._filter_by_config_tags(logs, config_tags)
         hierarchy = {
             "grandmaster": None,
             "parent_clock": None,
